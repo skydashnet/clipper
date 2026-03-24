@@ -55,6 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
         loader.classList.remove('hidden');
         workspace.classList.add('hidden');
         terminalSection.classList.add('hidden');
+        const dashGrid = document.getElementById('dashboard-grid');
+        if (dashGrid) dashGrid.classList.remove('has-terminal');
 
         try {
             const res = await fetch(`/api/analyze?url=${encodeURIComponent(url)}`);
@@ -195,6 +197,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.error) throw new Error(data.error);
 
             terminalSection.classList.remove('hidden');
+            const dashGrid = document.getElementById('dashboard-grid');
+            if (dashGrid) dashGrid.classList.add('has-terminal');
+            
+            const progressContainer = document.getElementById('progress-container');
+            const progressLabel = document.getElementById('progress-label');
+            const progressFill = document.getElementById('progress-fill');
+            
+            progressContainer.classList.remove('hidden');
+            progressFill.style.width = '0%';
+            progressLabel.textContent = 'Memulai Proses Ekstraksi...';
+
             terminalOutput.innerHTML = '>> Menghubungkan ke server logging latar belakang...\n';
 
             const eventSource = new EventSource(`/api/stream/${data.job_id}`);
@@ -202,6 +215,8 @@ document.addEventListener('DOMContentLoaded', () => {
             eventSource.onmessage = function (e) {
                 if (e.data.includes('[PROCESS_DONE]')) {
                     terminalOutput.innerHTML += '\n\n<span style="color:#00ff88;">[OK] EKSTRAKSI SELESAI. Klip disimpan di folder /clips.</span>';
+                    progressFill.style.width = '100%';
+                    progressLabel.textContent = 'Selesai! Klip tersimpan.';
                     eventSource.close();
                     startBtn.disabled = false;
                     startBtn.textContent = 'MULAI EKSTRAK KLIP [実行]';
@@ -209,10 +224,59 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (e.data.includes('[PROCESS_ERROR]')) {
                     terminalOutput.innerHTML += '\n\n<span style="color:#ff3366;">[ERROR] PROSES GAGAL. Silakan periksa log di atas.</span>';
+                    progressFill.style.backgroundColor = 'var(--danger)';
+                    progressLabel.textContent = 'Proses Gagal!';
                     eventSource.close();
                     startBtn.disabled = false;
                     startBtn.textContent = 'MULAI EKSTRAK KLIP [実行]';
                     return;
+                }
+
+                // Parser Progress Bar
+                const textData = e.data.replace(/<[^>]*>?/gm, '').trim();
+                
+                if (textData.includes('[download]') && textData.includes('%')) {
+                    const match = textData.match(/(\d+\.?\d*)%/);
+                    if (match) {
+                        progressFill.style.width = Math.min(30, parseFloat(match[1]) * 0.3) + '%';
+                        progressLabel.textContent = `Mengunduh Video (${match[1]}%)`;
+                    }
+                } else if (textData.includes('Clip')) {
+                    progressFill.style.width = '35%';
+                    progressLabel.textContent = textData;
+                } else if (textData.includes('Extracting')) {
+                    progressFill.style.width = '45%';
+                    progressLabel.textContent = 'Mengekstrak Segmen...';
+                } else if (textData.includes('Remux')) {
+                    progressFill.style.width = '55%';
+                    progressLabel.textContent = 'Optimasi Video (Remux)...';
+                } else if (textData.includes('Crop to vertical')) {
+                    progressFill.style.width = '65%';
+                    progressLabel.textContent = 'Memotong Video (9:16)...';
+                } else if (textData.includes('Whisper')) {
+                    progressFill.style.width = '75%';
+                    progressLabel.textContent = 'Memuat AI Audio...';
+                } else if (textData.includes('Transcribing')) {
+                    progressFill.style.width = '85%';
+                    progressLabel.textContent = 'Mentranskripsi Subtitle...';
+                } else if (textData.includes('Burning')) {
+                    progressFill.style.width = '95%';
+                    progressLabel.textContent = 'Membakar Subtitle (Hardsub)...';
+                } else if (textData.includes('frame=')) {
+                    progressLabel.textContent = 'Memproses Video... (Cek Terminal)';
+                    const timeMatch = textData.match(/time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
+                    if (timeMatch) {
+                        const h = parseInt(timeMatch[1]);
+                        const m = parseInt(timeMatch[2]);
+                        const s = parseInt(timeMatch[3]);
+                        const totalSecs = h * 3600 + m * 60 + s;
+                        /* Assuming active phase starts at 50% and max clip length is ~60s */
+                        const currentP = parseFloat(progressFill.style.width) || 50;
+                        const newP = Math.min(95, 50 + (totalSecs / 60) * 45);
+                        if (newP > currentP) {
+                            progressFill.style.width = newP + '%';
+                        }
+                    }
                 }
 
                 terminalOutput.innerHTML += e.data + '\n';

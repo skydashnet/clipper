@@ -11,7 +11,7 @@ Tools otomatis modern yang dapat mengekstrak bagian paling viral / paling sering
   - Dukungan potong *Center* (di tengah) atau *Split-Screen* (kamera atas, *gameplay* bawah).
   - Bisa _custom_ Padding, nama Font, ukuran Font, sampai warna Font hex.
   - Preview interaktif via Web Dashboard modern gaya *Cyber-Tokyo*.
-- **Anti Lemot / Anti Blok**: Mendukung *multi-threading* `aria2c` untuk _bypass_ masalah _download throttling_ YouTube. Otomatis nge-detect file `cookies.txt` untuk mendownload video **Batas Umur (18+)** maupun **Video Khusus Member (Members-Only)**!
+- **Anti Lemot / Anti Blok**: Mendukung *multi-threading* `aria2c` untuk _bypass_ masalah _download throttling_ YouTube. Otomatis nge-detect file `cookies.txt` untuk memastikan hasil download selalu **Kualitas Resolusi Tinggi (HD / 1080p)**, serta bisa mendownload **Batas Umur (18+)** maupun **Video Khusus Member (Members-Only)**!
 
 ## Persyaratan Sistem
 
@@ -40,8 +40,8 @@ pip install -r requirements.txt
 pip install flask yt-dlp faster-whisper requests
 ```
 
-## 🍪 Setup `cookies.txt` (PENTING Untuk Lewati Batasan Akun)
-Jika kamu ingin mendownload video yang dibatasi umur (Age-Restricted) atau diprivasi khusus member, kamu membutuhkan file `cookies.txt`.
+## 🍪 Setup `cookies.txt` (PENTING Untuk Download Kualitas HD & Dilewati Batasan Akun)
+Jika kamu ingin mendownload video secara kencang dengan **Kualitas Tertinggi (1080p HD)** atau mendownload video yang dibatasi umur (Age-Restricted) dan privasi khusus member, kamu sangat membutuhkan file `cookies.txt`! (Karena YouTube seringkali menyembunyikan kualitas HD untuk lalu lintas yang terdeteksi sebagai robot/anonymous).
 1. Install Ekstensi Browser seperti **"Get cookies.txt LOCALLY"** (tersedia di Chrome/Edge/Firefox).
 2. Buka Youtube.com di browsermu dan pastikan kamu sudah Login.
 3. Klik Icon Ekstensi-nya lalu klik tombol **Export** cookies.

@@ -34,124 +34,137 @@
                 <span class="loading-text">Menganalisis Data Metrik YouTube...</span>
             </div>
 
-            <div id="workspace" class="hidden">
-                <!-- Step 2: Video Details & Timeline -->
-                <section class="card">
-                    <h2>02 // DETAIL VIDEO</h2>
-                    <div class="video-meta">
-                        <img id="video-thumbnail" src="" alt="Thumbnail">
-                        <div class="video-info">
-                            <h3 id="video-title">Judul Video</h3>
-                            <p id="video-duration">Durasi: 00:00</p>
-                        </div>
-                    </div>
-
-                    <div class="heatmap-section">
-                        <div class="section-header">
-                            <h4>DAFTAR HEATMAP TERDETEKSI</h4>
-                            <span class="badge" id="segment-count">0 KLIP</span>
-                        </div>
-                        <div class="clip-selector-list" id="clip-selector-list">
-                            <!-- Checkboxes injected via JS -->
-                        </div>
-                        <p class="help-text">Pilih klip mana saja yang ingin diekstrak. Semakin tinggi skor, semakin viral segmen tersebut.</p>
-                        
-                        <div class="setting-item full-width mt-1">
-                            <label>Atau Input Manual Timestamps</label>
-                            <input type="text" id="manual-input" placeholder="Contoh: 10-25, 120-180 (Opsional)">
-                            <p class="help-text">Abaikan daftar di atas dan ekstrak detik spesifik secara spesifik. (Format: start-end dipisah koma).</p>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Step 3: Settings -->
-                <section class="card">
-                    <h2>03 // PENGATURAN EKSPOR</h2>
-                    
-                    <div class="settings-grid">
-                        <div class="setting-item">
-                            <label>Mode Pemotongan (Crop)</label>
-                            <select id="crop-select">
-                                <option value="1">Default (Potong Tengah / Center)</option>
-                                <option value="2">Split Left (Atas: Gameplay, Bawah: Kamera)</option>
-                                <option value="3">Split Right (Atas: Kamera, Bawah: Gameplay)</option>
-                            </select>
-                        </div>
-                        
-                        <div class="setting-item">
-                            <label>Subtitle Otomatis (AI)</label>
-                            <select id="subtitle-select">
-                                <option value="1">Aktif (Bakar Subtitle ke Video)</option>
-                                <option value="0">Nonaktif</option>
-                            </select>
-                        </div>
-
-                        <div class="setting-item sub-setting">
-                            <label>Model AI Whisper</label>
-                            <select id="model-select">
-                                <option value="tiny">Tiny (Paling Cepat, Akurasi Rendah)</option>
-                                <option value="base">Base</option>
-                                <option value="small" selected>Small (Direkomendasikan)</option>
-                                <option value="medium">Medium</option>
-                                <option value="large-v3">Large-v3 (Paling Lambat, Paling Akurat)</option>
-                            </select>
-                        </div>
-
-                        <div class="setting-item sub-setting">
-                            <label>Padding Potongan (Detik)</label>
-                            <input type="number" id="padding-input" value="10" min="0" max="60">
-                        </div>
-
-                        <div class="setting-item sub-setting">
-                            <label>Font Subtitle</label>
-                            <div class="font-preview-container">
-                                <select id="font-select">
-                                    <option value="Arial" style="font-family: Arial;">Arial</option>
-                                    <option value="Impact" style="font-family: Impact;">Impact (Tebal)</option>
-                                    <option value="Comic Sans MS" style="font-family: 'Comic Sans MS';">Comic Sans</option>
-                                    <option value="Trebuchet MS" style="font-family: 'Trebuchet MS';">Trebuchet</option>
-                                    <option value="Verdana" style="font-family: Verdana;">Verdana</option>
-                                    <option value="Tahoma" style="font-family: Tahoma;">Tahoma</option>
-                                    <option value="Times New Roman" style="font-family: 'Times New Roman';">Times New Roman</option>
-                                    <option value="Courier New" style="font-family: 'Courier New';">Courier New</option>
-                                    <option value="Georgia" style="font-family: Georgia;">Georgia</option>
-                                </select>
-                                <div id="font-preview" class="font-preview" style="font-family: Arial; color: #ffffff; font-size: 13px;">Contoh</div>
+            <div id="dashboard-grid" class="dashboard-grid">
+                <div id="workspace" class="hidden workspace-col">
+                    <!-- Step 2: Video Details & Timeline -->
+                    <section class="card">
+                        <h2>02 // DETAIL VIDEO</h2>
+                        <div class="video-meta">
+                            <img id="video-thumbnail" src="" alt="Thumbnail">
+                            <div class="video-info">
+                                <h3 id="video-title">Judul Video</h3>
+                                <p id="video-duration">Durasi: 00:00</p>
                             </div>
                         </div>
 
-                        <div class="setting-item sub-setting">
-                            <label>Ukuran Font</label>
-                            <input type="number" id="font-size-input" value="13" min="8" max="72">
+                        <div class="heatmap-section">
+                            <div class="section-header">
+                                <h4>DAFTAR HEATMAP TERDETEKSI</h4>
+                                <span class="badge" id="segment-count">0 KLIP</span>
+                            </div>
+                            <div class="clip-selector-list" id="clip-selector-list">
+                                <!-- Checkboxes injected via JS -->
+                            </div>
+                            <p class="help-text">Pilih klip mana saja yang ingin diekstrak. Semakin tinggi skor, semakin viral segmen tersebut.</p>
+                            
+                            <div class="setting-item full-width mt-1">
+                                <label>Atau Input Manual Timestamps</label>
+                                <input type="text" id="manual-input" placeholder="Contoh: 10-25, 120-180 (Opsional)">
+                                <p class="help-text">Abaikan daftar di atas dan ekstrak detik spesifik secara spesifik. (Format: start-end dipisah koma).</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Step 3: Settings -->
+                    <section class="card">
+                        <h2>03 // PENGATURAN EKSPOR</h2>
+                        
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <label>Mode Pemotongan (Crop)</label>
+                                <select id="crop-select">
+                                    <option value="1">Default (Potong Tengah / Center)</option>
+                                    <option value="2">Split Left (Atas: Gameplay, Bawah: Kamera)</option>
+                                    <option value="3">Split Right (Atas: Kamera, Bawah: Gameplay)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label>Subtitle Otomatis (AI)</label>
+                                <select id="subtitle-select">
+                                    <option value="1">Aktif (Bakar Subtitle ke Video)</option>
+                                    <option value="0">Nonaktif</option>
+                                </select>
+                            </div>
+
+                            <div class="setting-item sub-setting">
+                                <label>Model AI Whisper</label>
+                                <select id="model-select">
+                                    <option value="tiny">Tiny (Paling Cepat, Akurasi Rendah)</option>
+                                    <option value="base">Base</option>
+                                    <option value="small" selected>Small (Direkomendasikan)</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="large-v3">Large-v3 (Paling Lambat, Paling Akurat)</option>
+                                </select>
+                            </div>
+
+                            <div class="setting-item sub-setting">
+                                <label>Padding Potongan (Detik)</label>
+                                <input type="number" id="padding-input" value="10" min="0" max="60">
+                            </div>
+
+                            <div class="setting-item sub-setting">
+                                <label>Font Subtitle</label>
+                                <div class="font-preview-container">
+                                    <select id="font-select">
+                                        <option value="Arial" style="font-family: Arial;">Arial</option>
+                                        <option value="Helvetica" style="font-family: Helvetica;">Helvetica</option>
+                                        <option value="Verdana" style="font-family: Verdana;">Verdana</option>
+                                        <option value="Tahoma" style="font-family: Tahoma;">Tahoma</option>
+                                        <option value="Trebuchet MS" style="font-family: 'Trebuchet MS';">Trebuchet MS</option>
+                                        <option value="Segoe UI" style="font-family: 'Segoe UI';">Segoe UI</option>
+                                        <option value="Impact" style="font-family: Impact;">Impact (Tebal)</option>
+                                        <option value="Arial Black" style="font-family: 'Arial Black';">Arial Black (Tebal)</option>
+                                        <option value="Times New Roman" style="font-family: 'Times New Roman';">Times New Roman</option>
+                                        <option value="Georgia" style="font-family: Georgia;">Georgia</option>
+                                        <option value="Garamond" style="font-family: Garamond;">Garamond</option>
+                                        <option value="Courier New" style="font-family: 'Courier New';">Courier New</option>
+                                        <option value="Consolas" style="font-family: Consolas;">Consolas</option>
+                                        <option value="Comic Sans MS" style="font-family: 'Comic Sans MS';">Comic Sans MS</option>
+                                    </select>
+                                    <div id="font-preview" class="font-preview" style="font-family: Arial; color: #ffffff; font-size: 13px;">Contoh</div>
+                                </div>
+                            </div>
+
+                            <div class="setting-item sub-setting">
+                                <label>Ukuran Font</label>
+                                <input type="number" id="font-size-input" value="13" min="8" max="72">
+                            </div>
+
+                            <div class="setting-item sub-setting">
+                                <label>Warna Font Subtitle</label>
+                                <input type="color" id="font-color-input" value="#ffffff" style="height: 48px; padding: 0.25rem;">
+                            </div>
+
+                            <div class="setting-item sub-setting" style="display: none;">
+                                <!-- Hide max clips box since user selects them manually now via checkboxes -->
+                                <label>Maksimal Klip</label>
+                                <input type="number" id="max-clips-input" value="100" min="1" max="100">
+                            </div>
                         </div>
 
-                        <div class="setting-item sub-setting">
-                            <label>Warna Font Subtitle</label>
-                            <input type="color" id="font-color-input" value="#ffffff" style="height: 48px; padding: 0.25rem;">
+                        <div class="action-footer">
+                            <button id="start-btn" class="btn btn-primary btn-large">MULAI EKSTRAK KLIP [実行]</button>
                         </div>
+                    </section>
+                </div>
 
-                        <div class="setting-item sub-setting" style="display: none;">
-                            <!-- Hide max clips box since user selects them manually now via checkboxes -->
-                            <label>Maksimal Klip</label>
-                            <input type="number" id="max-clips-input" value="100" min="1" max="100">
+                <!-- Step 4: Terminal & Progress -->
+                <section id="terminal-section" class="card hidden terminal-col terminal-card">
+                    <div class="terminal-header">
+                        <span class="terminal-title">>> SYSTEM_LOG // システムログ</span>
+                    </div>
+                    <div class="progress-container hidden" id="progress-container">
+                        <div class="progress-status" id="progress-label">Memulai Proses...</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
                         </div>
                     </div>
-
-                    <div class="action-footer">
-                        <button id="start-btn" class="btn btn-primary btn-large">MULAI EKSTRAK KLIP [実行]</button>
+                    <div class="terminal-body" id="terminal-output">
+                        <!-- Logs injected here -->
                     </div>
                 </section>
             </div>
-
-            <!-- Step 4: Terminal -->
-            <section id="terminal-section" class="card hidden terminal-card">
-                <div class="terminal-header">
-                    <span class="terminal-title">>> SYSTEM_LOG // システムログ</span>
-                </div>
-                <div class="terminal-body" id="terminal-output">
-                    <!-- Logs injected here -->
-                </div>
-            </section>
         </main>
     </div>
 

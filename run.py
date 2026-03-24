@@ -136,6 +136,33 @@ def run_visible(cmd, **kwargs):
     """Run a subprocess with output visible in terminal."""
     return subprocess.run(cmd, text=True, **kwargs)
 
+def run_ffmpeg_progress(cmd: list, label: str):
+    """Run FFmpeg and stream its progress to stdout so the UI can grab it."""
+    print(f"  🎬 Memulai {label}...")
+    
+    if "-progress" not in cmd:
+        cmd = cmd[:1] + ["-v", "warning", "-stats"] + cmd[1:]
+        
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        universal_newlines=True,
+        encoding="utf-8",
+        errors="replace"
+    )
+    
+    for line in process.stdout:
+        lineStr = line.strip()
+        if "frame=" in lineStr or "size=" in lineStr or "time=" in lineStr:
+            print(f"  [FFMPEG] {lineStr}", flush=True)
+
+    process.wait()
+    if process.returncode != 0:
+        fail(f"{label} gagal!")
+        raise subprocess.CalledProcessError(process.returncode, cmd)
+    ok(f"{label} selesai.")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  DEPENDENCY CHECK
@@ -428,20 +455,19 @@ def remux_to_faststart(src: str, dst: str) -> bool:
         dst,
     ]
     try:
-        with Spinner("Remux & convert to H.264"):
-            run_silent(cmd)
+        run_ffmpeg_progress(cmd, "Optimasi Video (Remux)")
         return True
     except subprocess.CalledProcessError as e:
-        fail(f"Remux failed: {e.stderr[:120]}")
+        fail(f"Remux failed: {e}")
         return False
 
 
-def crop_to_vertical(src: str, dst: str, mode: str) -> bool:
+def crop_to_vertical(src: str, dst: str, mode: int) -> bool:
     """
     Crop and scale a horizontal video into 720x1280 (9:16) vertical format.
-    Supports three modes: default, split_left, split_right.
+    Supports three modes: 1=default, 2=split_left, 3=split_right.
     """
-    if mode == "default":
+    if mode == 1:
         vf = "scale=-2:1280,crop=720:1280:(iw-720)/2:(ih-1280)/2"
         cmd = [
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
@@ -452,7 +478,7 @@ def crop_to_vertical(src: str, dst: str, mode: str) -> bool:
             dst,
         ]
     else:
-        cam_x = "0" if mode == "split_left" else f"iw-720"
+        cam_x = "0" if mode == 2 else f"iw-720"
         vf = (
             f"scale=-2:1280[sc];"
             f"[sc]split=2[a][b];"
@@ -471,11 +497,10 @@ def crop_to_vertical(src: str, dst: str, mode: str) -> bool:
         ]
 
     try:
-        with Spinner("Crop to vertical 9:16"):
-            run_silent(cmd)
+        run_ffmpeg_progress(cmd, "Potong Video (Crop to vertical)")
         return True
     except subprocess.CalledProcessError as e:
-        fail(f"Crop failed: {e.stderr[:200]}")
+        fail(f"Crop failed: {e}")
         return False
 
 
@@ -483,85 +508,94 @@ def crop_to_vertical(src: str, dst: str, mode: str) -> bool:
 #  SUBTITLE GENERATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-def secs_to_srt_ts(secs: float) -> str:
-    """Convert float seconds to SRT timestamp: HH:MM:SS,mmm"""
+def secs_to_ass_ts(secs: float) -> str:
+    """Convert float seconds to ASS timestamp: H:MM:SS.cs"""
     h  = int(secs // 3600)
     m  = int((secs % 3600) // 60)
     s  = int(secs % 60)
-    ms = int((secs % 1) * 1000)
-    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+    cs = int((secs % 1) * 100)
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
-
-def transcribe_and_write_srt(video_file: str, srt_file: str) -> bool:
+def transcribe_and_write_ass(video_file: str, ass_file: str, font: str, font_size: int, font_color: str) -> bool:
     """
-    Transcribe audio using Faster-Whisper and write an SRT subtitle file.
-    Returns True on success.
+    Transcribe audio using Faster-Whisper and write a Karaoke ASS subtitle file.
     """
     try:
         from faster_whisper import WhisperModel
-
         step(f"Loading Whisper model '{WHISPER_MODEL}'...")
         model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
-        ok("Model loaded. Transcribing audio...")
+        ok("Model loaded. Transcribing audio with word timestamps...")
 
-        segments, _ = model.transcribe(video_file, language="id")
+        segments, _ = model.transcribe(video_file, language="id", word_timestamps=True)
 
-        with open(srt_file, "w", encoding="utf-8") as f:
-            idx = 1
+        if font_color.startswith("#"):
+            font_color = font_color[1:]
+        if len(font_color) == 6:
+            high_color = f"&H{font_color[4:6]}{font_color[2:4]}{font_color[0:2]}&"
+        else:
+            high_color = "&H00FFFF&"
+
+        base_color = "&HFFFFFF&"
+
+        with open(ass_file, "w", encoding="utf-8") as f:
+            f.write("[Script Info]\nScriptType: v4.00+\nPlayResX: 720\nPlayResY: 1280\n\n")
+            f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+            f.write(f"Style: Default,{font},{font_size},{base_color},&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,1,2,10,10,100,1\n\n")
+            f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+            
+            lines_written = 0
             for seg in segments:
-                try:
+                if not seg.words:
+                    start_ts = secs_to_ass_ts(seg.start)
+                    end_ts = secs_to_ass_ts(seg.end)
                     text = seg.text.strip()
-                    if not text:
-                        continue
-                    f.write(f"{idx}\n")
-                    f.write(f"{secs_to_srt_ts(seg.start)} --> {secs_to_srt_ts(seg.end)}\n")
-                    f.write(f"{text}\n\n")
-                    idx += 1
-                except Exception:
+                    if text:
+                        f.write(f"Dialogue: 0,{start_ts},{end_ts},Default,,0,0,0,,{text}\n")
+                        lines_written += 1
                     continue
+                    
+                for i, active_word in enumerate(seg.words):
+                    start_ts = secs_to_ass_ts(active_word.start)
+                    end_ts = secs_to_ass_ts(seg.words[i+1].start) if i + 1 < len(seg.words) else secs_to_ass_ts(seg.end)
+                    
+                    text_parts = []
+                    for j, w in enumerate(seg.words):
+                        word_str = w.word.strip()
+                        if j == i:
+                            text_parts.append(f"{{\\c{high_color}}}{word_str}{{\\c{base_color}}}")
+                        else:
+                            text_parts.append(word_str)
+                    
+                    dialogue_text = " ".join(text_parts)
+                    f.write(f"Dialogue: 0,{start_ts},{end_ts},Default,,0,0,0,,{dialogue_text}\n")
+                    lines_written += 1
 
-        ok(f"Subtitle written ({idx - 1} lines).")
+        ok(f"Karaoke Subtitle written ({lines_written} lines).")
         return True
 
     except Exception as e:
         fail(f"Transcription error: {e}")
         return False
 
-
-def burn_subtitles(src: str, srt: str, dst: str, font: str = "Arial", font_size: int = 13, font_color: str = "FFFFFF") -> bool:
-    abs_srt  = os.path.abspath(srt)
-    safe_srt = abs_srt.replace("\\", "/").replace(":", "\\:")
-
-    if font_color.startswith("#"):
-        font_color = font_color[1:]
-    if len(font_color) == 6:
-        ass_color = f"&H{font_color[4:6]}{font_color[2:4]}{font_color[0:2]}"
-    else:
-        ass_color = "&HFFFFFF"
+def burn_subtitles(src: str, ass_file: str, dst: str) -> bool:
+    abs_ass  = os.path.abspath(ass_file)
+    safe_ass = abs_ass.replace("\\", "/").replace(":", "\\:")
 
     cmd = [
         "ffmpeg", "-y", "-hide_banner",
         "-i", src,
-        "-vf", (
-            f"subtitles='{safe_srt}':force_style='"
-            f"FontName={font},FontSize={font_size},Bold=1,"
-            f"PrimaryColour={ass_color},OutlineColour=&H000000,"
-            "BorderStyle=1,Outline=2,Shadow=1,MarginV=100'"
-        ),
+        "-vf", f"subtitles='{safe_ass}'",
         "-c:v", "libx264", "-preset", "fast", "-crf", "18",
         "-c:a", "copy",
         dst,
     ]
 
-    print("  🔤 Burning subtitles (progress di bawah)...")
-    result = subprocess.run(cmd, text=True)
-
-    if result.returncode != 0:
+    try:
+        run_ffmpeg_progress(cmd, "Membakar Subtitle (Hardsub)")
+        return True
+    except subprocess.CalledProcessError:
         fail("Subtitle burn failed.")
         return False
-
-    ok("Subtitles burned.")
-    return True
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  CLIP PIPELINE
@@ -585,10 +619,10 @@ def process_clip(full_video: str, segment: dict, clip_num: int,
     raw_file  = f"_tmp_raw_{clip_num}.mp4"
     fix_file  = f"_tmp_fix_{clip_num}.mp4"
     crop_file = f"_tmp_crop_{clip_num}.mp4"
-    srt_file  = f"_tmp_sub_{clip_num}.srt"
+    ass_file  = f"_tmp_sub_{clip_num}.ass"
     out_file  = os.path.join(OUTPUT_DIR, f"clip_{clip_num}.mp4")
 
-    temp_files = [raw_file, fix_file, crop_file, srt_file]
+    temp_files = [raw_file, fix_file, crop_file, ass_file]
 
     print(f"\n{'═' * 54}")
     print(
@@ -631,10 +665,10 @@ def process_clip(full_video: str, segment: dict, clip_num: int,
 
         # ── Step 4: Subtitle (optional) ──────────────────────────────────────
         if use_subtitle:
-            transcribed = transcribe_and_write_srt(crop_file, srt_file)
-            if transcribed and os.path.exists(srt_file):
-                ok_sub = burn_subtitles(crop_file, srt_file, out_file, font, font_size, font_color)
-                cleanup(srt_file)
+            transcribed = transcribe_and_write_ass(crop_file, ass_file, font, font_size, font_color)
+            if transcribed and os.path.exists(ass_file):
+                ok_sub = burn_subtitles(crop_file, ass_file, out_file)
+                cleanup(ass_file)
                 if not ok_sub:
                     warn("Subtitle burn failed — saving without subtitle.")
                     if os.path.exists(crop_file):
