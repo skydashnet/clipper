@@ -14,5 +14,13 @@ if not exist "venv\Scripts\activate.bat" (
 )
 
 call venv\Scripts\activate.bat
+
+:: Ensure waitress is installed for stable server
+pip install waitress -q 2>nul
+
+echo.
+echo [*] Launching browser in 2 seconds...
+start "" "http://localhost:5000"
+
 python app.py
 pause

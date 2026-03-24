@@ -238,7 +238,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (textData.includes('[download]') && textData.includes('%')) {
                     const match = textData.match(/(\d+\.?\d*)%/);
                     if (match) {
-                        progressFill.style.width = Math.min(30, parseFloat(match[1]) * 0.3) + '%';
+                        const dlPercent = parseFloat(match[1]);
+                        /* Download = 0-80% of bar, post-processing = 80-100% */
+                        const barWidth = Math.min(80, dlPercent * 0.8);
+                        progressFill.style.width = barWidth + '%';
                         progressLabel.textContent = `Mengunduh Video (${match[1]}%)`;
                     }
                 } else if (textData.includes('Clip')) {

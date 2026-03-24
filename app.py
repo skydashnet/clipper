@@ -136,13 +136,14 @@ def stream(job_id):
             
         with open(log_path, 'r', encoding='utf-8') as f:
             while True:
-                line = f.readline()
-                if not line:
+                lines = f.readlines(8192)
+                if not lines:
                     if job_id in jobs and jobs[job_id]["status"] != "running":
                         break
-                    time.sleep(0.2)
+                    time.sleep(0.05)
                     continue
-                yield f"data: {line.strip()}\n\n"
+                for line in lines:
+                    yield f"data: {line.strip()}\n\n"
                 
         final_status = jobs.get(job_id, {}).get("status", "unknown")
         yield f"data: [PROCESS_{final_status.upper()}]\n\n"
@@ -150,4 +151,15 @@ def stream(job_id):
     return Response(generate(), mimetype="text/event-stream")
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000, threaded=True)
+    try:
+        from waitress import serve
+        print("=" * 50)
+        print("  Skydash.NET Dashboard")
+        print("  http://localhost:5000")
+        print("=" * 50)
+        serve(app, host="0.0.0.0", port=5000, threads=8)
+    except ImportError:
+        print("[WARN] Waitress not installed, using Flask dev server.")
+        print("[WARN] Web UI may freeze during heavy processing.")
+        print("[TIP]  Run: pip install waitress")
+        app.run(debug=True, port=5000, threaded=True)

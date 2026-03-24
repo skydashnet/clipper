@@ -27,7 +27,7 @@ call venv\Scripts\activate.bat
 :: Install Packages
 echo [*] Installing required Python packages...
 pip install --upgrade pip
-pip install flask yt-dlp faster-whisper requests
+pip install flask yt-dlp faster-whisper requests waitress
 
 echo.
 echo ===================================================
