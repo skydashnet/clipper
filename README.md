@@ -11,14 +11,14 @@ Tools otomatis modern yang dapat mengekstrak bagian paling viral / paling sering
   - Dukungan potong *Center* (di tengah) atau *Split-Screen* (kamera atas, *gameplay* bawah).
   - Bisa _custom_ Padding, nama Font, ukuran Font, sampai warna Font hex.
   - Preview interaktif via Web Dashboard modern gaya *Cyber-Tokyo*.
-- **Anti Lemot / Anti Blok**: Mendukung *multi-threading* `aria2c` untuk _bypass_ masalah _download throttling_ YouTube. Otomatis nge-detect file `cookies.txt` untuk memastikan hasil download selalu **Kualitas Resolusi Tinggi (HD / 1080p)**, serta bisa mendownload **Batas Umur (18+)** maupun **Video Khusus Member (Members-Only)**!
+- **Anti Lemot / Anti Blok**: Menggunakan *yt-dlp multi-threading* native untuk _bypass_ masalah _download throttling_ YouTube. Otomatis nge-detect file `cookies.txt` untuk memastikan hasil download selalu **Kualitas Resolusi Tinggi (HD / 1080p)**, serta bisa mendownload **Batas Umur (18+)** maupun **Video Khusus Member (Members-Only)**!
 
 ## Persyaratan Sistem
 
 - **Python 3.10+**
 - **FFmpeg**: Wajib ter-install dan ada di `PATH` sistem operasi kamu.
 - **Node.js**: Diperlukan untuk dekripsi beberapa _cipher_ kode pada plugin download.
-- **Aria2c**: Diperlukan supaya proses download video cepat dan tidak *stuck*.
+
 
 ## Cara Instalasi
 

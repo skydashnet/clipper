@@ -190,25 +190,7 @@ def check_dependencies(need_whisper: bool):
         except Exception:
             warn("Node.js check failed.")
 
-    aria2_path = shutil.which("aria2c")
-    if not aria2_path:
-        local_appdata = os.environ.get("LOCALAPPDATA", "")
-        if local_appdata:
-            possible_path = os.path.join(local_appdata, "Microsoft", "WinGet", "Packages")
-            if os.path.exists(possible_path):
-                for root, _, files in os.walk(possible_path):
-                    if "aria2c.exe" in files:
-                        aria2_path = os.path.join(root, "aria2c.exe")
-                        break
 
-    if not aria2_path:
-        fail("aria2c not found. This is required to bypass YouTube download throttling (stuck at 0bps).")
-        info("Please install aria2 (e.g., 'winget install aria2' on Windows).")
-        info("If you just installed it, RESTART YOUR TERMINAL.")
-        sys.exit(1)
-    
-    os.environ["PATH"] += os.pathsep + os.path.dirname(aria2_path)
-    ok("aria2c found.")
     info("Updating yt-dlp...")
     subprocess.run(
         [sys.executable, "-m", "pip", "install", "-U", "yt-dlp", "-q"],
@@ -369,49 +351,91 @@ def _probe_resolution(filepath: str) -> int:
     except Exception:
         return 0
 
+def _cleanup_partial_downloads(video_id: str, out_path: str):
+    """Remove all partial/temp download files to force a fresh start."""
+    import glob
+    patterns = [
+        f"_tmp_full_{video_id}*",
+        f"{out_path}*",
+        f"*.f137.*",
+        f"*.f140.*",
+    ]
+    for pat in patterns:
+        for f in glob.glob(pat):
+            try:
+                os.remove(f)
+                info(f"Cleaned up partial file: {f}")
+            except Exception:
+                pass
+
+
 def download_full_video(video_id: str, out_path: str, cookies_source: str | None = None) -> bool:
     """
-    Download the entire YouTube video using yt-dlp and aria2c.
-    By downloading the full video locally first, we bypass YouTube's zero-byte
-    throttling that plagues ffmpeg range-requests for DASH segments.
+    Download the entire YouTube video using yt-dlp.
+    Uses --force-ipv4 to avoid IPv6-related 403 blocks.
+    Retries: Attempt 1 with cookies, Attempt 2 without cookies,
+    Attempt 3 with fallback format (720p).
     """
-    step("Downloading full video (using aria2c to bypass throttle)...")
-    cmd = [
+    step("Downloading full video...")
+
+    base_cmd = [
         sys.executable, "-m", "yt_dlp",
+        "--force-ipv4",
         "--js-runtimes",       "node",
         "--remote-components", "ejs:github",
         "-S",                  "res:1080,ext:mp4:m4a,codec:h264",
-        "--downloader",        "m3u8:native",
-        "--downloader",        "dash,m3u8:aria2c",
-        "--downloader-args",   "aria2c:-x 8 -s 8 -j 8 -k 5M --summary-interval=0",
-        "--concurrent-fragments", "5",
+        "--rm-cache-dir",
+        "--no-continue",
         "--retries",           "10",
         "--fragment-retries",  "10",
         "--socket-timeout",    "30",
-        "-f",                  VIDEO_FORMAT,
         "--merge-output-format", "mp4",
         "-o",                  out_path,
     ]
 
-    if cookies_source and os.path.isfile(cookies_source):
-        cmd += ["--cookies", cookies_source]
+    has_cookies = cookies_source and os.path.isfile(cookies_source)
 
-    cmd.append(f"https://youtu.be/{video_id}")
+    # Build list of attempts with different strategies
+    attempts = []
 
-    proc = subprocess.Popen(cmd)
-    proc.wait()
+    # Attempt 1: Best format with cookies (if available)
+    if has_cookies:
+        cmd1 = base_cmd + ["-f", VIDEO_FORMAT, "--cookies", cookies_source]
+        attempts.append(("HD + Cookies + IPv4", cmd1))
 
-    if proc.returncode != 0:
-        fail("yt-dlp exited with errors.")
-        return False
-    if not os.path.exists(out_path):
-        fail("Output file not found after download.")
-        return False
+    # Attempt 2: Best format WITHOUT cookies
+    cmd2 = base_cmd + ["-f", VIDEO_FORMAT]
+    attempts.append(("HD + No Cookies + IPv4", cmd2))
+
+    # Attempt 3: Fallback simpler format string (like reference project)
+    fallback_fmt = "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b"
+    cmd3 = base_cmd + ["-f", fallback_fmt]
+    if has_cookies:
+        cmd3 += ["--cookies", cookies_source]
+    attempts.append(("Fallback Format + IPv4", cmd3))
+
+    for i, (label, cmd) in enumerate(attempts, 1):
+        info(f"Percobaan {i}/{len(attempts)}: {label}")
+
+        # Clean up partial files from previous attempts
+        _cleanup_partial_downloads(video_id, out_path)
+
+        full_cmd = cmd + [f"https://youtu.be/{video_id}"]
+        proc = subprocess.Popen(full_cmd)
+        proc.wait()
+
+        if proc.returncode == 0 and os.path.exists(out_path):
+            height = _probe_resolution(out_path)
+            if height > 0:
+                ok(f"Downloaded in {height}p. (Strategy: {label})")
+            else:
+                ok(f"Download complete. (Strategy: {label})")
+            return True
         
-    height = _probe_resolution(out_path)
-    if height > 0:
-        ok(f"Downloaded in {height}p.")
-    return True
+        warn(f"Percobaan {i} gagal ({label}). {'Mencoba strategi lain...' if i < len(attempts) else ''}")
+
+    fail("Semua percobaan download gagal.")
+    return False
 
 def extract_clip_segment(full_video: str, t_start: float, t_end: float, out_path: str) -> bool:
     """
@@ -832,7 +856,7 @@ def main():
         fail("No valid segments found for this video.")
         info("The video may not have 'Most Replayed' data yet.")
         info(f"Try lowering MIN_HEAT_SCORE (currently {MIN_HEAT_SCORE}) in run.py.")
-        return
+        sys.exit(1)
 
     ok(f"Found {len(segments)} high-engagement segment(s).")
 
@@ -845,7 +869,6 @@ def main():
     print(f"  Subtitle       : {'Yes (' + WHISPER_MODEL + ')' if use_subtitle else 'No'}")
     print(f"  Output folder  : {OUTPUT_DIR}/")
 
-    total_duration = get_video_duration(video_id)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # ── Download Full Video ONCE ──────────────────────────────────────────────
@@ -854,7 +877,7 @@ def main():
         ok_full = download_full_video(video_id, full_video_path, cookies_source)
         if not ok_full:
             fail("Failed to download the full video. Aborting.")
-            return
+            sys.exit(1)
     else:
         ok(f"Using previously downloaded full video: {full_video_path}")
 

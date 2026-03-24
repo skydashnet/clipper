@@ -43,14 +43,7 @@ if %errorlevel% neq 0 (
     echo [OK] FFmpeg found.
 )
 
-:: Check aria2c
-aria2c --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [WARNING] aria2 is missing! Downloads will be extremely slow.
-    echo Please install aria2 (e.g. via 'winget install aria2')
-) else (
-    echo [OK] aria2c found.
-)
+
 
 :: Check Node.js
 node --version >nul 2>&1
