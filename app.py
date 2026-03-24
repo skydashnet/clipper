@@ -150,4 +150,4 @@ def stream(job_id):
     return Response(generate(), mimetype="text/event-stream")
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000, threaded=True)
