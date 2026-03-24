@@ -559,7 +559,8 @@ select:focus {
     font-size: 0.8125rem;
     height: 300px;
     overflow-y: auto;
-    white-space: pre-wrap;
+    overflow-x: auto;
+    white-space: pre;
     line-height: 1.5;
     color: #e5e5e5;
 }
