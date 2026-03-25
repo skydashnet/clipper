@@ -158,6 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const padding = document.getElementById('padding-input').value;
         const fontSize = document.getElementById('font-size-input').value;
         const fontColor = document.getElementById('font-color-input').value;
+        const highlightColor = document.getElementById('highlight-color-input').value;
 
         let segmentString = manualInput;
 
@@ -181,7 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
             max_clips: parseInt(maxClips) || 100,
             padding: parseInt(padding) || 10,
             font_size: parseInt(fontSize) || 13,
-            font_color: fontColor
+            font_color: fontColor,
+            highlight_color: highlightColor
         };
 
         try {
@@ -199,11 +201,11 @@ document.addEventListener('DOMContentLoaded', () => {
             terminalSection.classList.remove('hidden');
             const dashGrid = document.getElementById('dashboard-grid');
             if (dashGrid) dashGrid.classList.add('has-terminal');
-            
+
             const progressContainer = document.getElementById('progress-container');
             const progressLabel = document.getElementById('progress-label');
             const progressFill = document.getElementById('progress-fill');
-            
+
             progressContainer.classList.remove('hidden');
             progressFill.style.width = '0%';
             progressLabel.textContent = 'Memulai Proses Ekstraksi...';
@@ -234,12 +236,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Parser Progress Bar
                 const textData = e.data.replace(/<[^>]*>?/gm, '').trim();
-                
+
                 if (textData.includes('[download]') && textData.includes('%')) {
                     const match = textData.match(/(\d+\.?\d*)%/);
                     if (match) {
                         const dlPercent = parseFloat(match[1]);
-                        /* Download = 0-80% of bar, post-processing = 80-100% */
                         const barWidth = Math.min(80, dlPercent * 0.8);
                         progressFill.style.width = barWidth + '%';
                         progressLabel.textContent = `Mengunduh Video (${match[1]}%)`;
@@ -282,7 +283,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                terminalOutput.innerHTML += e.data + '\n';
+                const line = document.createElement('div');
+                line.innerHTML = e.data;
+                terminalOutput.appendChild(line);
+
+                while (terminalOutput.childNodes.length > 500) {
+                    terminalOutput.removeChild(terminalOutput.firstChild);
+                }
                 terminalOutput.scrollTop = terminalOutput.scrollHeight;
             };
 

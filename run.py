@@ -540,7 +540,7 @@ def secs_to_ass_ts(secs: float) -> str:
     cs = int((secs % 1) * 100)
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
-def transcribe_and_write_ass(video_file: str, ass_file: str, font: str, font_size: int, font_color: str) -> bool:
+def transcribe_and_write_ass(video_file: str, ass_file: str, font: str, font_size: int, font_color: str, highlight_color: str) -> bool:
     """
     Transcribe audio using Faster-Whisper and write a Karaoke ASS subtitle file.
     """
@@ -550,26 +550,43 @@ def transcribe_and_write_ass(video_file: str, ass_file: str, font: str, font_siz
         model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
         ok("Model loaded. Transcribing audio with word timestamps...")
 
-        segments, _ = model.transcribe(video_file, language="id", word_timestamps=True)
+        segments_gen, info_result = model.transcribe(video_file, language="id", word_timestamps=True)
+        segments = list(segments_gen)
+        info(f"Transcribed {len(segments)} segment(s). Language: {info_result.language}")
 
         if font_color.startswith("#"):
             font_color = font_color[1:]
         if len(font_color) == 6:
-            high_color = f"&H{font_color[4:6]}{font_color[2:4]}{font_color[0:2]}&"
+            base_color = f"&H{font_color[4:6]}{font_color[2:4]}{font_color[0:2]}&"
         else:
-            high_color = "&H00FFFF&"
+            base_color = "&HFFFFFF&"
 
-        base_color = "&HFFFFFF&"
+        if highlight_color.startswith("#"):
+            highlight_color = highlight_color[1:]
+        if len(highlight_color) == 6:
+            high_color = f"&H{highlight_color[4:6]}{highlight_color[2:4]}{highlight_color[0:2]}&"
+        else:
+            high_color = "&H00D7FF&"
+
+        info(f"Base color: {base_color}, Highlight color: {high_color}")
+
+        ass_font_size = max(font_size * 2, 26)
 
         with open(ass_file, "w", encoding="utf-8") as f:
-            f.write("[Script Info]\nScriptType: v4.00+\nPlayResX: 720\nPlayResY: 1280\n\n")
-            f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-            f.write(f"Style: Default,{font},{font_size},{base_color},&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,1,2,10,10,100,1\n\n")
-            f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+            f.write("[Script Info]\nScriptType: v4.00+\nPlayResX: 720\nPlayResY: 1280\nWrapStyle: 0\n\n")
+            f.write("[V4+ Styles]\n")
+            f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+            f.write(f"Style: Default,{font},{ass_font_size},{base_color},&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,5,10,10,20,1\n\n")
+            f.write("[Events]\n")
+            f.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
             
             lines_written = 0
+            karaoke_count = 0
+            plain_count = 0
             for seg in segments:
-                if not seg.words:
+                has_words = seg.words is not None and len(seg.words) > 0
+                if not has_words:
+                    plain_count += 1
                     start_ts = secs_to_ass_ts(seg.start)
                     end_ts = secs_to_ass_ts(seg.end)
                     text = seg.text.strip()
@@ -586,15 +603,22 @@ def transcribe_and_write_ass(video_file: str, ass_file: str, font: str, font_siz
                     for j, w in enumerate(seg.words):
                         word_str = w.word.strip()
                         if j == i:
-                            text_parts.append(f"{{\\c{high_color}}}{word_str}{{\\c{base_color}}}")
+                            color_on = r"{\c" + high_color + "}"
+                            color_off = r"{\c" + base_color + "}"
+                            text_parts.append(f"{color_on}{word_str}{color_off}")
                         else:
                             text_parts.append(word_str)
                     
                     dialogue_text = " ".join(text_parts)
                     f.write(f"Dialogue: 0,{start_ts},{end_ts},Default,,0,0,0,,{dialogue_text}\n")
                     lines_written += 1
+                    karaoke_count += 1
 
-        ok(f"Karaoke Subtitle written ({lines_written} lines).")
+        if karaoke_count > 0:
+            ok(f"Karaoke Subtitle written ({lines_written} lines, {karaoke_count} karaoke, {plain_count} plain).")
+        else:
+            warn(f"No word-level timestamps! All {plain_count} lines are plain (no karaoke effect).")
+            warn("Try using model 'large-v3' or 'medium' for better word timestamps.")
         return True
 
     except Exception as e:
@@ -608,7 +632,7 @@ def burn_subtitles(src: str, ass_file: str, dst: str) -> bool:
     cmd = [
         "ffmpeg", "-y", "-hide_banner",
         "-i", src,
-        "-vf", f"subtitles='{safe_ass}'",
+        "-vf", f"ass='{safe_ass}'",
         "-c:v", "libx264", "-preset", "fast", "-crf", "18",
         "-c:a", "copy",
         dst,
@@ -628,7 +652,8 @@ def burn_subtitles(src: str, ass_file: str, dst: str) -> bool:
 def process_clip(full_video: str, segment: dict, clip_num: int,
                  total_dur: int, crop_mode: str,
                  use_subtitle: bool, font: str = "Arial",
-                 padding: int = 10, font_size: int = 13, font_color: str = "FFFFFF") -> bool:
+                 padding: int = 10, font_size: int = 13, font_color: str = "FFFFFF",
+                 highlight_color: str = "FFD700") -> bool:
     """
     Full pipeline for a single clip:
       1. Extract segment  →  2. Remux  →  3. Crop  →  4. Subtitle  →  5. Save
@@ -689,10 +714,10 @@ def process_clip(full_video: str, segment: dict, clip_num: int,
 
         # ── Step 4: Subtitle (optional) ──────────────────────────────────────
         if use_subtitle:
-            transcribed = transcribe_and_write_ass(crop_file, ass_file, font, font_size, font_color)
+            transcribed = transcribe_and_write_ass(crop_file, ass_file, font, font_size, font_color, highlight_color)
             if transcribed and os.path.exists(ass_file):
+                info(f"ASS file saved for inspection: {os.path.abspath(ass_file)}")
                 ok_sub = burn_subtitles(crop_file, ass_file, out_file)
-                cleanup(ass_file)
                 if not ok_sub:
                     warn("Subtitle burn failed — saving without subtitle.")
                     if os.path.exists(crop_file):
@@ -787,7 +812,8 @@ def main():
     parser.add_argument("--model", type=str, default="small", help="Whisper model size (tiny, base, small, medium, large)")
     parser.add_argument("--font", type=str, default="Arial", help="Font name for subtitles")
     parser.add_argument("--font-size", type=int, default=13, help="Subtitle font size inside ffmpeg")
-    parser.add_argument("--font-color", type=str, default="FFFFFF", help="Subtitle Hex Color (e.g. FFFFFF)")
+    parser.add_argument("--font-color", type=str, default="#FFFFFF", help="Subtitle base Hex Color (e.g. #FFFFFF)")
+    parser.add_argument("--highlight-color", type=str, default="#FFD700", help="Karaoke highlight Hex Color (e.g. #FFD700)")
     parser.add_argument("--manual", type=str, help="Comma-separated manual segments, e.g. '10-20,30-45'")
     parser.add_argument("--max-clips", type=int, default=10, help="Maximum number of clips to generate")
     parser.add_argument("--padding", type=int, default=10, help="Padding in seconds around segment")
@@ -808,13 +834,15 @@ def main():
         font = args.font
         font_size = args.font_size
         font_color = args.font_color
+        highlight_color = args.highlight_color
     else:
         # ── User selections ───────────────────────────────────────────────────────
         crop_mode, crop_label = ask_crop_mode()
         use_subtitle          = ask_subtitle()
         font = "Arial"
         font_size = 13
-        font_color = "FFFFFF"
+        font_color = "#FFFFFF"
+        highlight_color = "#FFD700"
         section("🔗  YouTube URL")
         url = input("  Paste YouTube link: ").strip()
 
@@ -897,7 +925,8 @@ def main():
             font,
             CLIP_PADDING,
             font_size,
-            font_color
+            font_color,
+            highlight_color
         ):
             saved += 1
 

@@ -94,7 +94,8 @@ def start_job():
     max_clips = data.get('max_clips', 10)
     padding = data.get('padding', 10)
     font_size = data.get('font_size', 13)
-    font_color = data.get('font_color', 'FFFFFF')
+    font_color = data.get('font_color', '#FFFFFF')
+    highlight_color = data.get('highlight_color', '#FFD700')
 
     # Construct command
     args = [
@@ -104,7 +105,8 @@ def start_job():
         "--max-clips", str(max_clips),
         "--padding", str(padding),
         "--font-size", str(font_size),
-        "--font-color", str(font_color)
+        "--font-color", str(font_color),
+        "--highlight-color", str(highlight_color)
     ]
     if model:
         args.extend(["--model", model])
@@ -135,15 +137,37 @@ def stream(job_id):
             return
             
         with open(log_path, 'r', encoding='utf-8') as f:
+            last_dl_send = 0
+            pending_dl_line = None
+            
             while True:
                 lines = f.readlines(8192)
                 if not lines:
+                    if pending_dl_line:
+                        yield f"data: {pending_dl_line}\n\n"
+                        pending_dl_line = None
                     if job_id in jobs and jobs[job_id]["status"] != "running":
                         break
-                    time.sleep(0.05)
+                    time.sleep(0.1)
                     continue
+                
+                now = time.time()
                 for line in lines:
-                    yield f"data: {line.strip()}\n\n"
+                    stripped = line.strip()
+                    if not stripped:
+                        continue
+                    
+                    if '[download]' in stripped and '%' in stripped:
+                        pending_dl_line = stripped
+                        if now - last_dl_send >= 1.0:
+                            yield f"data: {stripped}\n\n"
+                            last_dl_send = now
+                            pending_dl_line = None
+                    else:
+                        if pending_dl_line:
+                            yield f"data: {pending_dl_line}\n\n"
+                            pending_dl_line = None
+                        yield f"data: {stripped}\n\n"
                 
         final_status = jobs.get(job_id, {}).get("status", "unknown")
         yield f"data: [PROCESS_{final_status.upper()}]\n\n"
